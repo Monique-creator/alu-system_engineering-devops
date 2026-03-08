@@ -1,52 +1,20 @@
 #!/usr/bin/env bash
 # Installs and configures HAproxy on lb-01 to balance traffic between web-01 and web-02
 
-# Install HAProxy
-apt-get update -y
-apt-get install -y haproxy
+apt-get -y update
+apt-get -y install haproxy
 
-# Enable HAProxy to be managed via init script
-sed -i 's/ENABLED=0/ENABLED=1/' /etc/default/haproxy
-echo "ENABLED=1" >> /etc/default/haproxy
+echo "
+frontend lb-frontend
+        bind *:80
+        mode http
+        default_backend lb-backend
+backend lb-backend
+        balance roundrobin
+        server 7030-web-01 3.82.193.211:80 check
+        server 7030-web-02 44.212.20.80:80 check
+" | tee -a /etc/haproxy/haproxy.cfg
 
-# Configure HAProxy
-cat > /etc/haproxy/haproxy.cfg << 'EOF'
-global
-    log /dev/log local0
-    log /dev/log local1 notice
-    chroot /var/lib/haproxy
-    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
-    stats timeout 30s
-    user haproxy
-    group haproxy
-    daemon
-
-defaults
-    log global
-    mode http
-    option httplog
-    option dontlognull
-    timeout connect 5000
-    timeout client  50000
-    timeout server  50000
-    errorfile 400 /etc/haproxy/errors/400.http
-    errorfile 403 /etc/haproxy/errors/403.http
-    errorfile 408 /etc/haproxy/errors/408.http
-    errorfile 500 /etc/haproxy/errors/500.http
-    errorfile 502 /etc/haproxy/errors/502.http
-    errorfile 503 /etc/haproxy/errors/503.http
-    errorfile 504 /etc/haproxy/errors/504.http
-
-frontend http_front
-    bind *:80
-    default_backend http_back
-
-backend http_back
-    balance roundrobin
-    server 7030-web-01 3.82.193.211:80 check
-    server 7030-web-02 44.212.20.80:80 check
-EOF
-
-# Start/restart HAProxy
-service haproxy start || service haproxy restart
+echo "ENABLED=1" | tee -a /etc/default/haproxy
+service haproxy restart
 
